@@ -2,10 +2,22 @@
 
 
 [[projects]]
+  name = "github.com/pierrec/lz4"
+  packages = [".","internal/xxh32"]
+  revision = "635575b42742856941dbc767b44905bb9ba083f6"
+  version = "v2.0.7"
+
+[[projects]]
   name = "github.com/satori/go.uuid"
   packages = ["."]
   revision = "f58768cc1a7a7e77a3bd49e98cdd21419399b6a3"
   version = "v1.2.0"
+
+[[projects]]
+  name = "github.com/ulikunitz/xz"
+  packages = [".","internal/hash","internal/xlog","lzma"]
+  revision = "590df8077fbcb06ad62d7714da06c00e5dd2316d"
+  version = "v0.5.5"
 
 [[projects]]
   branch = "master"
@@ -16,6 +28,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "db113688e0bd2396a6e881d2f286fd0bc116c5f741633154206a95b45990d4c3"
+  inputs-digest = "3666c766d5f62eecc59ac8f30b2bcdab5b13b2ff995170ab42b74fb47e08643e"
   solver-name = "gps-cdcl"
   solver-version = 1
