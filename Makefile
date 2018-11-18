@@ -1,6 +1,6 @@
 .PHONY: test image unit_test
 
-IMAGE ?= deitch/godiskfs:build
+IMAGE ?= diskfs/godiskfs:build
 
 image:
 	docker build -t $(IMAGE) testhelper/docker
