@@ -7,8 +7,10 @@ import (
 
 // File represents a single file in a squashfs filesystem
 //  it is NOT used when working in a workspace, where we just use the underlying OS
+//  note that the inode for a file can be the basicFile or extendedFile. We just use extendedFile to
+//  include all of the data
 type File struct {
-	*basicFile
+	*extendedFile
 	isReadWrite bool
 	isAppend    bool
 	offset      int64
@@ -21,14 +23,23 @@ type File struct {
 // reads from the last known offset in the file from last read or write
 // use Seek() to set at a particular point
 func (fl *File) Read(b []byte) (int, error) {
-	// we have the DirectoryEntry, so we can get the starting location and size
 	// squashfs files are *mostly* contiguous, we only need the starting location and size for whole blocks
 	// if there are fragments, we need the location of those as well
+
+	// logic:
+	// 1- find the uncompressed blocksize from the superblock
+	// 2- calculate the relative blocks needed for this file
+	//  e.g. if uncompressed blocksize is 100 bytes, and we want from byte 240 for 200 bytes,
+	//       then we need blocks 2,3,4 of this file
+	// 3- find the compressed blockSizes for this file from inode.blockSizes
+	//       this tells us how many bytes to read for each block from the disk
+	// 4- find the starting location for the first block for this file from inode.startBlock
+	//      e.g. if starting block is at position 10245, then we want blocks 27,28,29 from the disk
+	// 5- read in and uncompress the necessary blocks
 	fs := fl.filesystem
-	size := int(fl.size) - int(fl.offset)
-	location := int(fl.startBlock)
+	size := int(fl.size()) - int(fl.offset)
+	location := int64(fl.startBlock)
 	maxRead := size
-	file := fs.file
 
 	// if there is nothing left to read, just return EOF
 	if size <= 0 {
@@ -44,43 +55,58 @@ func (fl *File) Read(b []byte) (int, error) {
 
 	// just read the requested number of bytes and change our offset
 	// figure out which block number has the bytes we are looking for
-	startBlock := fl.offset / fs.blocksize
-	offset := fl.offset % fs.blocksize
-	endBlock := (fl.offset + int64(maxRead)) / fs.blocksize
+	startBlock := int(fl.offset / fs.blocksize)
+	endBlock := int((fl.offset + int64(maxRead)) / fs.blocksize)
 
 	// do we end in fragment territory?
 	fragments := false
-	if endBlock > int64(len(fl.blockSizes)) {
+	if endBlock >= len(fl.blockSizes) {
 		fragments = true
 		endBlock--
 	}
 
 	read := 0
-	for i := startBlock; i <= endBlock; i++ {
-		block := fl.basicFile.blockSizes[i-startBlock]
-		input, err := fs.readBlock(i, block.compressed, block.size)
-		if err != nil {
-			return read, fmt.Errorf("Error reading data block %d from squashfs: %v", i, err)
+	offset := fl.offset
+	// we need to cycle through all of the blocks to find where the desired one starts
+	for i, block := range fl.blockSizes {
+		if i > endBlock || read > maxRead {
+			break
 		}
-		copy(b[read:], input)
-		read += len(input)
-		offset = 0
+		// if we are in the range of desired ones, read it in
+		if i >= startBlock {
+			input, err := fs.readBlock(location, block.compressed, block.size)
+			if err != nil {
+				return read, fmt.Errorf("Error reading data block %d from squashfs: %v", i, err)
+			}
+			// we do not need to limit it to the remaining space of b, since copy() only will copy
+			//   to what space it has in b
+			copy(b[read:], input[offset:])
+			read += len(input)
+			fl.offset += int64(read)
+			offset = 0
+		}
+		location += int64(block.size)
 	}
 	// did we have a fragment to read?
 	if fragments {
-		input, err := fs.readFragment(fl.basicFile.fragmentBlockIndex, fl.basicFile.fragmentOffset, int64(fl.size)%fs.blocksize)
+		input, err := fs.readFragment(fl.fragmentBlockIndex, fl.fragmentOffset, int64(fl.size())%fs.blocksize)
 		if err != nil {
-			return read, fmt.Errorf("Error reading fragment block %d from squashfs: %v", fl.basicFile.fragmentBlockIndex, err)
+			return read, fmt.Errorf("Error reading fragment block %d from squashfs: %v", fl.fragmentBlockIndex, err)
 		}
 		copy(b[read:], input)
 	}
-	return maxRead, nil
+	fl.offset = fl.offset + int64(maxRead)
+	var retErr error
+	if fl.offset >= int64(size) {
+		retErr = io.EOF
+	}
+	return maxRead, retErr
 }
 
 // Write writes len(b) bytes to the File.
-//  you cannot write to an iso, so this returns an error
+//  you cannot write to a finished squashfs, so this returns an error
 func (fl *File) Write(p []byte) (int, error) {
-	return 0, fmt.Errorf("Cannot write to a read-only iso filesystem")
+	return 0, fmt.Errorf("Cannot write to a read-only squashfs filesystem")
 }
 
 // Seek set the offset to a particular point in the file
@@ -90,7 +116,7 @@ func (fl *File) Seek(offset int64, whence int) (int64, error) {
 	case io.SeekStart:
 		newOffset = offset
 	case io.SeekEnd:
-		newOffset = int64(fl.size) + offset
+		newOffset = int64(fl.size()) - offset
 	case io.SeekCurrent:
 		newOffset = fl.offset + offset
 	}

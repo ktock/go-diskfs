@@ -47,41 +47,54 @@ func parseRootInode(u uint64) *inodeRef {
 	return i
 }
 
-type superblock struct {
-	inodes                uint32
-	modTime               time.Time
-	blocksize             uint32
-	fragmentCount         uint32
-	compression           compression
-	idCount               uint16
-	versionMajor          uint16
-	versionMinor          uint16
-	rootInode             *inodeRef
-	size                  uint64
-	idTableStart          uint64
-	xattrTableStart       uint64
-	inodeTableStart       uint64
-	directoryTableStart   uint64
-	fragmentTableStart    uint64
-	exporttableStart      uint64
+type superblockFlags struct {
 	uncompressedInodes    bool
 	uncompressedData      bool
 	uncompressedFragments bool
-	uncompressedXattrs    bool
-	uncompressedIDs       bool
 	noFragments           bool
 	alwaysFragments       bool
 	dedup                 bool
 	exportable            bool
+	uncompressedXattrs    bool
 	noXattrs              bool
 	compressorOptions     bool
+	uncompressedIDs       bool
+}
+
+type superblock struct {
+	inodes              uint32
+	modTime             time.Time
+	blocksize           uint32
+	fragmentCount       uint32
+	compression         compression
+	idCount             uint16
+	versionMajor        uint16
+	versionMinor        uint16
+	rootInode           *inodeRef
+	size                uint64
+	idTableStart        uint64
+	xattrTableStart     uint64
+	inodeTableStart     uint64
+	directoryTableStart uint64
+	fragmentTableStart  uint64
+	exportTableStart    uint64
+	superblockFlags
 }
 
 func (s *superblock) equal(a *superblock) bool {
-	return *s == *a
+	// to compare, need to extract the rootInode
+	inodeEql := *a.rootInode == *s.rootInode
+	s1 := &superblock{}
+	a1 := &superblock{}
+	*s1 = *s
+	*a1 = *a
+	s1.rootInode = nil
+	a1.rootInode = nil
+	sblockEql := *s1 == *a1
+	return inodeEql && sblockEql
 }
 
-func (s *superblock) flagsUint16() uint16 {
+func (s *superblockFlags) bytes() []byte {
 	var flags uint16
 	if s.uncompressedInodes {
 		flags |= 0x0001
@@ -116,15 +129,17 @@ func (s *superblock) flagsUint16() uint16 {
 	if s.uncompressedIDs {
 		flags |= 0x0800
 	}
-	return flags
+	b := make([]byte, 2)
+	binary.LittleEndian.PutUint16(b, flags)
+	return b
 }
-func parseFlags(b []byte) (*superblock, error) {
+func parseFlags(b []byte) (*superblockFlags, error) {
 	targetLength := 2
 	if len(b) != targetLength {
 		return nil, fmt.Errorf("Received %d bytes instead of expected %d", len(b), targetLength)
 	}
 	flags := binary.LittleEndian.Uint16(b)
-	s := &superblock{
+	s := &superblockFlags{
 		uncompressedInodes:    flags&0x0001 == 0x0001,
 		uncompressedData:      flags&0x0002 == 0x0002,
 		uncompressedFragments: flags&0x0008 == 0x0008,
@@ -149,7 +164,7 @@ func (s *superblock) toBytes() []byte {
 	binary.LittleEndian.PutUint32(b[16:20], s.fragmentCount)
 	binary.LittleEndian.PutUint16(b[20:22], uint16(s.compression))
 	binary.LittleEndian.PutUint16(b[22:24], uint16(math.Log2(float64(s.blocksize))))
-	binary.LittleEndian.PutUint16(b[24:26], s.flagsUint16())
+	copy(b[24:26], s.superblockFlags.bytes())
 	binary.LittleEndian.PutUint16(b[26:28], s.idCount)
 	binary.LittleEndian.PutUint16(b[28:30], superblockMajorVersion)
 	binary.LittleEndian.PutUint16(b[30:32], superblockMinorVersion)
@@ -160,7 +175,7 @@ func (s *superblock) toBytes() []byte {
 	binary.LittleEndian.PutUint64(b[64:72], s.inodeTableStart)
 	binary.LittleEndian.PutUint64(b[72:80], s.directoryTableStart)
 	binary.LittleEndian.PutUint64(b[80:88], s.fragmentTableStart)
-	binary.LittleEndian.PutUint64(b[88:96], s.exporttableStart)
+	binary.LittleEndian.PutUint64(b[88:96], s.exportTableStart)
 	return b
 }
 func parseSuperblock(b []byte) (*superblock, error) {
@@ -188,31 +203,23 @@ func parseSuperblock(b []byte) (*superblock, error) {
 		return nil, fmt.Errorf("Error parsing flags bytes: %v", err)
 	}
 	s := &superblock{
-		inodes:                binary.LittleEndian.Uint32(b[4:8]),
-		modTime:               time.Unix(int64(binary.LittleEndian.Uint32(b[8:12])), 0),
-		blocksize:             blocksize,
-		fragmentCount:         binary.LittleEndian.Uint32(b[16:20]),
-		compression:           compression(binary.LittleEndian.Uint16(b[20:22])),
-		idCount:               binary.LittleEndian.Uint16(b[26:28]),
-		rootInode:             parseRootInode(binary.LittleEndian.Uint64(b[32:40])),
-		size:                  binary.LittleEndian.Uint64(b[40:48]),
-		idTableStart:          binary.LittleEndian.Uint64(b[48:56]),
-		xattrTableStart:       binary.LittleEndian.Uint64(b[56:64]),
-		inodeTableStart:       binary.LittleEndian.Uint64(b[64:72]),
-		directoryTableStart:   binary.LittleEndian.Uint64(b[72:80]),
-		fragmentTableStart:    binary.LittleEndian.Uint64(b[80:88]),
-		exporttableStart:      binary.LittleEndian.Uint64(b[88:96]),
-		uncompressedInodes:    flags.uncompressedInodes,
-		uncompressedData:      flags.uncompressedData,
-		uncompressedFragments: flags.uncompressedFragments,
-		noFragments:           flags.noFragments,
-		alwaysFragments:       flags.alwaysFragments,
-		dedup:                 flags.dedup,
-		exportable:            flags.exportable,
-		uncompressedXattrs:    flags.uncompressedXattrs,
-		noXattrs:              flags.noXattrs,
-		compressorOptions:     flags.compressorOptions,
-		uncompressedIDs:       flags.uncompressedIDs,
+		inodes:              binary.LittleEndian.Uint32(b[4:8]),
+		modTime:             time.Unix(int64(binary.LittleEndian.Uint32(b[8:12])), 0),
+		blocksize:           blocksize,
+		fragmentCount:       binary.LittleEndian.Uint32(b[16:20]),
+		compression:         compression(binary.LittleEndian.Uint16(b[20:22])),
+		idCount:             binary.LittleEndian.Uint16(b[26:28]),
+		versionMajor:        binary.LittleEndian.Uint16(b[28:30]),
+		versionMinor:        binary.LittleEndian.Uint16(b[30:32]),
+		rootInode:           parseRootInode(binary.LittleEndian.Uint64(b[32:40])),
+		size:                binary.LittleEndian.Uint64(b[40:48]),
+		idTableStart:        binary.LittleEndian.Uint64(b[48:56]),
+		xattrTableStart:     binary.LittleEndian.Uint64(b[56:64]),
+		inodeTableStart:     binary.LittleEndian.Uint64(b[64:72]),
+		directoryTableStart: binary.LittleEndian.Uint64(b[72:80]),
+		fragmentTableStart:  binary.LittleEndian.Uint64(b[80:88]),
+		exportTableStart:    binary.LittleEndian.Uint64(b[88:96]),
+		superblockFlags:     *flags,
 	}
 	return s, nil
 }
