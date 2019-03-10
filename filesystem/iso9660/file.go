@@ -75,3 +75,16 @@ func (fl *File) Seek(offset int64, whence int) (int64, error) {
 	fl.offset = newOffset
 	return fl.offset, nil
 }
+
+func (fl *File) Readlink() (string, error) {
+	for _, e := range fl.extensions {
+		switch e.(type) {
+		case rockRidgeSymlink:
+			rr, _ := e.(rockRidgeSymlink)
+			return rr.name, nil
+		default:
+			continue
+		}
+	}
+	return "", fmt.Errorf("Reading file is not symlink.")
+}

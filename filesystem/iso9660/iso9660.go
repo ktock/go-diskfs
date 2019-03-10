@@ -270,6 +270,11 @@ func Read(file util.File, size int64, start int64, blocksize int64) (*FileSystem
 }
 
 // Type returns the type code for the filesystem. Always returns filesystem.TypeFat32
+func (fs *FileSystem) RootEntry() *directoryEntry {
+	return fs.rootDir
+}
+
+// Type returns the type code for the filesystem. Always returns filesystem.TypeFat32
 func (fs *FileSystem) Type() filesystem.Type {
 	return filesystem.TypeISO9660
 }

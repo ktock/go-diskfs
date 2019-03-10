@@ -7,6 +7,7 @@ import (
 	"path"
 	"regexp"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -457,8 +458,9 @@ func (de *directoryEntry) Name() string {
 			case err != nil:
 				continue
 			default:
+				// We want to preserve dots on POSIX
 				name = filename
-				break
+				return name
 			}
 		}
 	}
@@ -492,9 +494,61 @@ func (de *directoryEntry) IsDir() bool {
 	return de.isSubdirectory
 }
 
+type Stat_t struct {
+        Dev       uint64
+        Ino       uint64
+        Nlink     uint64
+        Mode      os.FileMode
+        Uid       uint32
+        Gid       uint32
+        X__pad0   int32
+        Rdev      uint64
+        Size      int64
+        Blksize   int64
+        Blocks    int64
+        Atim      syscall.Timespec
+        Mtim      syscall.Timespec
+        Ctim      syscall.Timespec
+        X__unused [3]int64
+}
+
 // Sys() interface{}   // underlying data source (can return nil)
 func (de *directoryEntry) Sys() interface{} {
-	return nil
+	// make linux-style stat information
+	st := &Stat_t{}
+	for _, e := range de.extensions {
+		switch e.(type) {
+		case rockRidgePosixAttributes:
+			rr, _ := e.(rockRidgePosixAttributes)
+			st.Mode = rr.mode
+			st.Uid = rr.uid
+			st.Gid = rr.gid
+			st.Nlink = uint64(rr.linkCount)
+		case rockRidgePosixDeviceNumber:
+			rr, _ := e.(rockRidgePosixDeviceNumber)
+			strdev := make([]byte, 4)
+			binary.LittleEndian.PutUint32(strdev[4:8], rr.high)  // reconstruct the devicenum value in
+			binary.LittleEndian.PutUint32(strdev[12:16], rr.low) // the exact same way as the extraction.
+			st.Rdev = binary.LittleEndian.Uint64(strdev)
+		case rockRidgeTimestamps:
+			rr, _ := e.(rockRidgeTimestamps)
+			st.Atim = syscall.Timespec{Sec: rr.stamps[2].time.Unix(), Nsec: rr.stamps[2].time.UnixNano()} // Access
+			st.Mtim = syscall.Timespec{Sec: rr.stamps[1].time.Unix(), Nsec: rr.stamps[1].time.UnixNano()} // Modify
+			st.Ctim = syscall.Timespec{Sec: rr.stamps[0].time.Unix(), Nsec: rr.stamps[0].time.UnixNano()} // Creation
+		// case rockRidgeSparseFile:
+		default:
+			continue
+		}
+	}
+        st.Dev = 0                           // What value should we set?
+	st.Ino = 0                           // What value should we set?
+	st.X__pad0 = 0
+	st.Size = de.Size()
+        st.Blksize = de.filesystem.blocksize // can we get it correctly?
+        st.Blocks = st.Size % st.Blksize + 1 // can we get it correctly?
+	st.X__unused = [3]int64{ 0, 0, 0 }
+	
+	return st
 }
 
 // utilities
