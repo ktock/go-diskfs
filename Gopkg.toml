@@ -28,3 +28,8 @@
 [[constraint]]
   branch = "master"
   name = "golang.org/x/sys"
+
+[[constraint]]
+  name = "github.com/diskfs/go-diskfs"
+  branch = "fileinfo-sys"
+  source = "github.com/ktock/go-diskfs"

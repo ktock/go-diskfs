@@ -2,20 +2,57 @@
 
 
 [[projects]]
+  branch = "fileinfo-sys"
+  digest = "1:0d9442e2450361e56d8c08c0fb67323e5e1fea0aab7f4a95f960a4db76cd6020"
+  name = "github.com/diskfs/go-diskfs"
+  packages = [
+    ".",
+    "disk",
+    "filesystem",
+    "filesystem/fat32",
+    "filesystem/iso9660",
+    "partition",
+    "partition/gpt",
+    "partition/mbr",
+    "testhelper",
+    "util",
+  ]
+  pruneopts = ""
+  revision = "156b5a6d2f430fc0aef375554a7ca828c22c33bf"
+  source = "github.com/ktock/go-diskfs"
+
+[[projects]]
+  digest = "1:7f569d906bdd20d906b606415b7d794f798f91a62fcfb6a4daa6d50690fb7a3f"
   name = "github.com/satori/go.uuid"
   packages = ["."]
+  pruneopts = ""
   revision = "f58768cc1a7a7e77a3bd49e98cdd21419399b6a3"
   version = "v1.2.0"
 
 [[projects]]
   branch = "master"
+  digest = "1:a4bda6e065eb3ccf1e6adeaa863cb416e0ae6b43e613f20a8931d52d19dc20e2"
   name = "golang.org/x/sys"
   packages = ["unix"]
+  pruneopts = ""
   revision = "4497e2df6f9e69048a54498c7affbbec3294ad47"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "db113688e0bd2396a6e881d2f286fd0bc116c5f741633154206a95b45990d4c3"
+  input-imports = [
+    "github.com/diskfs/go-diskfs",
+    "github.com/diskfs/go-diskfs/disk",
+    "github.com/diskfs/go-diskfs/filesystem",
+    "github.com/diskfs/go-diskfs/filesystem/fat32",
+    "github.com/diskfs/go-diskfs/filesystem/iso9660",
+    "github.com/diskfs/go-diskfs/partition",
+    "github.com/diskfs/go-diskfs/partition/gpt",
+    "github.com/diskfs/go-diskfs/partition/mbr",
+    "github.com/diskfs/go-diskfs/testhelper",
+    "github.com/diskfs/go-diskfs/util",
+    "github.com/satori/go.uuid",
+    "golang.org/x/sys/unix",
+  ]
   solver-name = "gps-cdcl"
   solver-version = 1
