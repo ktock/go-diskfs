@@ -485,7 +485,7 @@ type basicSymlink struct {
 }
 
 func (i basicSymlink) readLink() string {
-	return target
+	return i.target
 }
 
 func (i basicSymlink) toBytes() []byte {
@@ -537,7 +537,7 @@ type extendedSymlink struct {
 }
 
 func (i extendedSymlink) readLink() string {
-	return target
+	return i.target
 }
 
 func (i extendedSymlink) toBytes() []byte {
