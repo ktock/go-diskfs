@@ -2,32 +2,54 @@
 
 
 [[projects]]
+  digest = "1:21b276e792044150a96175edd51d653649b9fd175c51a4613f2741b411c6d674"
   name = "github.com/pierrec/lz4"
-  packages = [".","internal/xxh32"]
-  revision = "635575b42742856941dbc767b44905bb9ba083f6"
-  version = "v2.0.7"
+  packages = [
+    ".",
+    "internal/xxh32",
+  ]
+  pruneopts = ""
+  revision = "062282ea0dcff40c9fb8525789eef9644b1fbd6e"
+  version = "v2.1.0"
 
 [[projects]]
+  digest = "1:7f569d906bdd20d906b606415b7d794f798f91a62fcfb6a4daa6d50690fb7a3f"
   name = "github.com/satori/go.uuid"
   packages = ["."]
+  pruneopts = ""
   revision = "f58768cc1a7a7e77a3bd49e98cdd21419399b6a3"
   version = "v1.2.0"
 
 [[projects]]
+  digest = "1:3f86e5e877dde45a8c767ba92f1526b41d1daa756f07e217db3177d23c54bbc5"
   name = "github.com/ulikunitz/xz"
-  packages = [".","internal/hash","internal/xlog","lzma"]
+  packages = [
+    ".",
+    "internal/hash",
+    "internal/xlog",
+    "lzma",
+  ]
+  pruneopts = ""
   revision = "590df8077fbcb06ad62d7714da06c00e5dd2316d"
   version = "v0.5.5"
 
 [[projects]]
   branch = "master"
+  digest = "1:a4bda6e065eb3ccf1e6adeaa863cb416e0ae6b43e613f20a8931d52d19dc20e2"
   name = "golang.org/x/sys"
   packages = ["unix"]
+  pruneopts = ""
   revision = "4497e2df6f9e69048a54498c7affbbec3294ad47"
 
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "3666c766d5f62eecc59ac8f30b2bcdab5b13b2ff995170ab42b74fb47e08643e"
+  input-imports = [
+    "github.com/pierrec/lz4",
+    "github.com/satori/go.uuid",
+    "github.com/ulikunitz/xz",
+    "github.com/ulikunitz/xz/lzma",
+    "golang.org/x/sys/unix",
+  ]
   solver-name = "gps-cdcl"
   solver-version = 1
