@@ -6,7 +6,7 @@ import (
 )
 
 const (
-	maxDirEntries   = 256
+	maxDirEntries   = 512
 	dirHeaderSize   = 12
 	dirEntryMinSize = 8
 	dirNameMaxSize  = 256
