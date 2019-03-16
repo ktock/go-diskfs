@@ -347,6 +347,68 @@ func (fs *FileSystem) OpenFile(p string, flag int) (filesystem.File, error) {
 	return f, nil
 }
 
+func (fs *FileSystem) Readlink(p string) (string, error) {
+	var link string
+	var err error
+
+	// get the path and filename
+	dir := path.Dir(p)
+	filename := path.Base(p)
+
+	// if the dir == filename, then it is just /
+	if dir == filename {
+		return nil, fmt.Errorf("Cannot open directory %s as file", p)
+	}
+
+	// cannot open to write or append or create if we do not have a workspace
+	if fs.workspace == "" {
+		var entries []*directoryEntry
+		entries, err = fs.readDirectory(dir)
+		if err != nil {
+			return nil, fmt.Errorf("Could not read directory entries for %s", dir)
+		}
+
+		// we now know that the directory exists, see if the file exists
+		var targetEntry *directoryEntry
+		for _, e := range entries {
+			eName := e.Name()
+			// cannot do anything with directories
+			if eName == filename && e.IsDir() {
+				return nil, fmt.Errorf("Cannot open directory %s as file", p)
+			}
+			if eName == filename {
+				// if we got this far, we have found the file
+				targetEntry = e
+				break
+			}
+		}
+
+		// see if the file exists
+		// if the file does not exist, and is not opened for os.O_CREATE, return an error
+		if targetEntry == nil {
+			return nil, fmt.Errorf("Target file %s does not exist", p)
+		}
+		// get the inode data for this file
+		// now open the file
+		// get the inode for the file
+		var eFile *extendedFile
+		in := targetEntry.inode
+		iType := in.inodeType()
+		switch iType {
+		case inodeBasicSymlink:
+			link = in.body.(*basicSymlink).readLink()
+		case inodeExtendedSymlink:
+			link = in.body.(*extendedSymlink).readLink()
+		default:
+			return nil, fmt.Errorf("inode is of type %d, neither basic nor extended directory", iType)
+		}
+	} else {
+		return "", fmt.Errorf("Workspace fs is only supported.")
+	}
+
+	return link, nil
+}
+
 // readDirectory - read directory entry on squashfs only (not workspace)
 func (fs *FileSystem) readDirectory(p string) ([]*directoryEntry, error) {
 	// use the root inode to find the location of the root direectory in the table

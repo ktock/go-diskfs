@@ -484,6 +484,10 @@ type basicSymlink struct {
 	target string
 }
 
+func (i basicSymlink) readLink() string {
+	return target
+}
+
 func (i basicSymlink) toBytes() []byte {
 	b := make([]byte, 8)
 	binary.LittleEndian.PutUint32(b[0:4], i.links)
@@ -530,6 +534,10 @@ type extendedSymlink struct {
 	links      uint32
 	target     string
 	xAttrIndex uint32
+}
+
+func (i extendedSymlink) readLink() string {
+	return target
 }
 
 func (i extendedSymlink) toBytes() []byte {
